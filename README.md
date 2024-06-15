@@ -6,6 +6,8 @@ Sjoerd Vink
 
 ## Description
 
+![pipeline](./reports/images/pipeline.png)
+
 This repository is part of the thesis project of the Applied Data Science Masters at Utrecht University. The system is designed to recommend visualizations based on input statistics derived from a knowledge graph (KG).
 
 ## Usage
