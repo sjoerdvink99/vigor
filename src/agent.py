@@ -65,10 +65,10 @@ class RecommendationAgent:
         for domain in log_data['q_table']:
             self.scores[domain] = {}
             self.indexes[domain] = Index(Space.Euclidean, num_dimensions=self.n_statistics)
-            for state_id in log_data['q_table'][domain]:
-                state_id_bytes = state_id.encode('latin-1')
-                self.scores[domain][state_id_bytes] = np.array(log_data['q_table'][domain][state_id])
-                self.add_index(domain, state_id_bytes)
+            for state_id_str in log_data['q_table'][domain]:
+                state_id = tuple(map(float, state_id_str.split(',')))
+                self.scores[domain][id] = np.array(log_data['q_table'][domain][state_id])
+                self.add_index(domain, state_id)
     
     def state_id(self, statistics):
         """
@@ -86,75 +86,66 @@ class RecommendationAgent:
         if len(values) < self.n_statistics:
             values.extend([0.0] * (self.n_statistics - len(values)))
 
-        return np.array(values[:self.n_statistics]).tobytes()
+        return tuple(values[:self.n_statistics])
+    
+    def format_state_id(self, state_id):
+        return ','.join(f"{val:.1f}" for val in state_id)
 
     def recommend_visualization(self, domain, state_id):
-        """
-        Recommends a visualization based on a domain and state ID.
-
-        Parameters:
-        domain (str): The domain.
-        state_id (bytes): The state ID.
-
-        Returns:
-        tuple: (Recommended action index, whether the action is exploratory).
-        """
         if not self.domains or not self.visualizations:
             raise ValueError("Both domains and visualizations must be defined before choosing an action.")
-        
-        q_table = self.scores[domain].get(state_id)
-        
-        # State id is not seen before
-        if q_table is None:
-            nearest_key = self.find_nearest_index(domain, state_id) # Find most similar alternative
-            if nearest_key is None:
-                # If no nearest neighbour, just initialize with zero's
-                q_table = np.random.rand(len(self.visualizations))
-            else:
-                # Use the nearest neighbour scores as initial scores
-                q_table = self.scores[domain].get(nearest_key)
-                if q_table is None:
-                    q_table = np.random.rand(len(self.visualizations))
-            
-            # Save the scores and index
-            self.scores[domain][state_id] = q_table
-            self.add_index(domain, state_id)
-            return random.randint(0, len(q_table) - 1), True
 
-        # Make exploration step
-        if random.uniform(0, 1) < self.epsilon or np.count_nonzero(q_table) == 0:
+        formatted_state_id = self.format_state_id(state_id)
+        q_table = self.scores[domain].get(formatted_state_id)
+
+        if q_table is None:
+            nearest_key = self.find_nearest_index(domain, state_id, n_neighbours=20)
+
+            if nearest_key is None:
+                q_table = np.full((1, len(self.visualizations)), 1)[0]
+            else:
+                neighbour_scores = []
+                for neighbour in nearest_key:
+                    formatted_neighbour = self.format_state_id(neighbour)
+                    score_set = self.scores[domain].get(formatted_neighbour)
+                    if score_set is not None:
+                        neighbour_scores.append(score_set)
+
+                if not neighbour_scores:
+                    q_table = np.full((1, len(self.visualizations)), 1)[0]
+                else:
+                    scores = []
+                    for col in zip(*neighbour_scores):
+                        scores.append(sum(col) / len(col))
+                    q_table = np.array(scores)
+
+            self.add_index(domain, state_id)
+            self.scores[domain][formatted_state_id] = q_table
+            self.log_update()
+
+        if random.uniform(0, 1) < self.epsilon:
             return random.randint(0, len(q_table) - 1), True
         else:
-            return np.argmax(q_table), False # Take the best option
-    
-    def update_q_value(self, domain, state_id, action, reward, require_feedback):
-        """
-        Updates the score of the recommendation based on the user-provided reward.
+            return np.argmax(q_table), False
 
-        Parameters:
-        domain (str): The domain.
-        state_id (bytes): The state ID.
-        action (int): The action index.
-        reward (float): The reward value.
-        require_feedback (bool): Whether feedback is required.
-        """
+    def update_q_value(self, domain, state_id, action, reward, require_feedback):
         if not self.domains or not self.visualizations:
             raise ValueError("Both domains and visualizations must be defined before choosing an action.")
-        
-        # Only update scores if it requires user-feedback
+
         if require_feedback:
             self.batch_updates.append((domain, state_id, action, reward))
 
             if len(self.batch_updates) >= self.batch_size:
                 for domain, state_id, action, reward in self.batch_updates:
-                        q_table = self.scores[domain].get(state_id)
-                        
-                        if q_table is None:
-                            q_table = np.zeros(len(self.visualizations))
-                            self.scores[domain][state_id] = q_table
-                        
-                        q_table[action] += self.alpha * (reward - q_table[action])
-                    
+                    formatted_state_id = self.format_state_id(state_id)
+                    q_table = self.scores[domain].get(formatted_state_id)
+
+                    if q_table is None:
+                        q_table = np.zeros(len(self.visualizations))
+                        self.scores[domain][formatted_state_id] = q_table
+
+                    q_table[action] += self.alpha * (reward - q_table[action])
+
                 self.batch_updates = []
                 self.log_update()
                 self.alpha = max(self.min_alpha, self.alpha * self.decay_rate)
@@ -163,11 +154,15 @@ class RecommendationAgent:
         """
         Logs the updated values to the database (json file in this case)
         """
-        scores_serializable = {domain: {state_id.decode('latin-1'): q_table.tolist() for state_id, q_table in domain_q.items()} for domain, domain_q in self.scores.items()}
+        scores_serializable = {
+            domain: {
+                ','.join(map(str, state_id)): q_table.tolist() for state_id, q_table in domain_q.items()
+            } for domain, domain_q in self.scores.items()
+        }
         
         try:
             with open(self.q_table_path, 'w') as file:
-                json.dump({'visualizations': self.visualizations, 'q_table': scores_serializable}, file, indent=4)
+                json.dump({'visualizations': self.visualizations, 'q_table': scores_serializable}, file, indent=4, default=lambda x: x.tolist() if isinstance(x, np.ndarray) else x)
         except Exception as e:
             raise RuntimeError(f"Failed to write Q-table to {self.q_table_path}: {e}")
 
@@ -218,7 +213,7 @@ class RecommendationAgent:
         domain (str): The domain.
         state_id (bytes): The state ID.
         """
-        self.indexes[domain].add_item(np.frombuffer(state_id, dtype=np.float64))
+        self.indexes[domain].add_item(list(state_id))
 
     def find_nearest_index(self, domain, state_id, n_neighbours=1):
         """
@@ -231,12 +226,12 @@ class RecommendationAgent:
         Returns:
         bytes: The nearest state ID.
         """
-        lookup_key = np.frombuffer(state_id, dtype=np.float64)
         try:
-            neighbors, _ = self.indexes[domain].query(lookup_key, k=n_neighbours)
-            if neighbors:
-                value_array = self.indexes[domain].get_vector(neighbors[0])
-                return np.array(value_array[:self.n_statistics]).tobytes()
+            neighbors, _ = self.indexes[domain].query(np.array(list(state_id), dtype=np.float32), k=n_neighbours)
+
+            if neighbors.any():
+                value_array = self.indexes[domain].get_vectors(neighbors)
+                return [tuple(val[:self.n_statistics]) for val in value_array]
             else:
                 return None
         except RuntimeError or TypeError:
