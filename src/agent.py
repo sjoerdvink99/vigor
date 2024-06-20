@@ -2,55 +2,68 @@ import os
 import json
 import random
 import numpy as np
-from voyager import Index, Space
+from voyager import Index, Space, StorageDataType
 
 class RecommendationAgent:
     def __init__(
             self,
             alpha=0.1,
-            epsilon=0.1,
+            min_alpha=0.05,
+            alpha_decay=0.99,
+            epsilon=0.5,
+            min_epsilon=0.1,
+            epsilon_decay=0.99,
             n_statistics=4,
             domains=None,
             visualizations=None,
             q_table_path=None,
             batch_size=10,
-            decay_rate=0.99,
-            min_alpha=0.05
         ):
         """
         Initializes the RecommendationAgent.
 
         Parameters:
         alpha (float): Learning rate.
+        min_alpha (float): Minimum learning rate after decay.
+        alpha_decay (float): Decay rate of the learning rate.
         epsilon (float): Exploration rate.
+        min_epsilon (float): Minimum exploration rate after decay.
+        epsilon_decay (float): Decay rate of the exploration rate.
         n_statistics (int): Number of statistics for state representation.
-        domains (list): List of domains.
-        visualizations (list): List of visualizations.
-        q_table_path (str): Path to the Q-table JSON file.
+        domains (list): List of domains for recommendations.
+        visualizations (list): List of visualization options.
+        q_table_path (str): Path to the Q-table JSON file for loading/saving state-action values.
+        batch_size (int): Batch size for updating Q-values.
         """
         self.alpha = alpha
         self.min_alpha = min_alpha
-        self.decay_rate = decay_rate
+        self.alpha_decay = alpha_decay
         
         self.epsilon = epsilon
+        self.min_epsilon = min_epsilon
+        self.epsilon_decay = epsilon_decay
 
         self.batch_size = batch_size
         self.batch_updates = []
 
         self.n_statistics = n_statistics
-        self.q_table_path = q_table_path if q_table_path else '../model/database.json'
         self.domains = domains if domains is not None else []
         self.visualizations = visualizations if visualizations is not None else []
         self.scores = {domain: {} for domain in self.domains}
         
-        self.indexes = {domain: Index(Space.Euclidean, num_dimensions=n_statistics) for domain in self.domains}
+        self.indexes = {domain: Index(Space.Cosine, num_dimensions=n_statistics, storage_data_type=StorageDataType.Float32) for domain in self.domains}
+        self.index_lookup = {}
 
+        self.q_table_path = q_table_path if q_table_path else '../model/database.json'
         if q_table_path and os.path.isfile(self.q_table_path):
             self.load_scores()
 
     def load_scores(self):
         """
         Loads the scores from an existing Q-table.
+
+        Raises:
+        RuntimeError: If the Q-table file cannot be loaded.
         """
         try:
             with open(self.q_table_path, 'r') as file:
@@ -64,21 +77,21 @@ class RecommendationAgent:
 
         for domain in log_data['q_table']:
             self.scores[domain] = {}
-            self.indexes[domain] = Index(Space.Euclidean, num_dimensions=self.n_statistics)
+            self.indexes[domain] = Index(Space.Cosine, num_dimensions=self.n_statistics, storage_data_type=StorageDataType.Float32)
             for state_id_str in log_data['q_table'][domain]:
                 state_id = tuple(map(float, state_id_str.split(',')))
-                self.scores[domain][id] = np.array(log_data['q_table'][domain][state_id])
+                self.scores[domain][state_id] = np.array(log_data['q_table'][domain][state_id_str])
                 self.add_index(domain, state_id)
     
     def state_id(self, statistics):
         """
-        Transforms a statistics object to a bytes array.
+        Transforms a statistics dictionary to a tuple representing the state ID.
 
         Parameters:
         statistics (dict): A dictionary of statistics.
 
         Returns:
-        bytes: Byte array representing the state ID.
+        tuple: Tuple representing the state ID, padded with zeros if necessary.
         """
         values = list(statistics.values())
 
@@ -89,9 +102,88 @@ class RecommendationAgent:
         return tuple(values[:self.n_statistics])
     
     def format_state_id(self, state_id):
+        """
+        Formats a state ID tuple as a string.
+
+        Parameters:
+        state_id (tuple): The state ID tuple.
+
+        Returns:
+        str: The formatted state ID string.
+        """
         return ','.join(f"{val:.1f}" for val in state_id)
 
     def recommend_visualization(self, domain, state_id):
+        """
+        Recommends a visualization for a given domain and state ID.
+
+        Parameters:
+        domain (str): The domain for which to recommend a visualization.
+        state_id (tuple): The state ID representing the current state.
+
+        Returns:
+        int: The index of the recommended visualization.
+
+        Raises:
+        ValueError: If domains or visualizations are not defined.
+        """
+        if not self.domains or not self.visualizations:
+            raise ValueError("Both domains and visualizations must be defined before choosing an action.")
+
+        # Format state id as string and get scores list
+        formatted_state_id = self.format_state_id(state_id)
+        q_table = self.scores[domain].get(formatted_state_id)
+        print('formatted_state_id, q_table', state_id, formatted_state_id, q_table)
+
+        if q_table is None:
+            q_table = self.initialize_q_table(domain, state_id)
+
+        # Choose either an exploitation or exploration step
+        if random.uniform(0, 1) < self.epsilon:
+            print('exploration step')
+            return random.randint(0, len(q_table) - 1)
+        else:
+            print('exploitation step')
+            return np.argmax(q_table)
+
+    def initialize_q_table(self, domain, state_id):
+        """
+        Initializes the Q-table for a new state ID.
+        
+        Parameters:
+        domain (str): The domain.
+        state_id (tuple): The state ID.
+        
+        Returns:
+        np.ndarray: The initialized Q-table.
+        """
+        nearest_keys = self.find_nearest_index(domain, state_id, n_neighbours=10)
+
+        if nearest_keys is None:
+            q_table = np.random.uniform(0.1, 0.2, len(self.visualizations))
+        else:
+            neighbour_scores = [self.scores[domain][self.format_state_id(neighbour)] for neighbour in nearest_keys]
+            q_table = np.array([sum(col) / len(col) for col in zip(*neighbour_scores)])
+
+        self.add_index(domain, state_id)
+        self.scores[domain][self.format_state_id(state_id)] = q_table
+        self.log_update()
+
+        return q_table
+    
+    def update_q_value(self, domain, state_id, action, reward):
+        """
+        Updates the Q-value for a given state-action pair.
+
+        Parameters:
+        domain (str): The domain for the state-action pair.
+        state_id (tuple): The state ID representing the current state.
+        action (int): The index of the action taken.
+        reward (float): The reward received for the action.
+
+        Raises:
+        ValueError: If domains or visualizations are not defined.
+        """
         if not self.domains or not self.visualizations:
             raise ValueError("Both domains and visualizations must be defined before choosing an action.")
 
@@ -99,64 +191,50 @@ class RecommendationAgent:
         q_table = self.scores[domain].get(formatted_state_id)
 
         if q_table is None:
-            nearest_key = self.find_nearest_index(domain, state_id, n_neighbours=20)
-
-            if nearest_key is None:
-                q_table = np.full((1, len(self.visualizations)), 1)[0]
-            else:
-                neighbour_scores = []
-                for neighbour in nearest_key:
-                    formatted_neighbour = self.format_state_id(neighbour)
-                    score_set = self.scores[domain].get(formatted_neighbour)
-                    if score_set is not None:
-                        neighbour_scores.append(score_set)
-
-                if not neighbour_scores:
-                    q_table = np.full((1, len(self.visualizations)), 1)[0]
-                else:
-                    scores = []
-                    for col in zip(*neighbour_scores):
-                        scores.append(sum(col) / len(col))
-                    q_table = np.array(scores)
-
-            self.add_index(domain, state_id)
+            q_table = np.zeros(len(self.visualizations))
             self.scores[domain][formatted_state_id] = q_table
+
+        q_table[action] += self.alpha * (reward - q_table[action])
+
+        self.batch_updates.append((domain, state_id, action, reward))
+
+        # Update nearest neighbors in batch mode
+        if len(self.batch_updates) >= self.batch_size:
+            for domain_batch, state_id_batch, action_batch, reward_batch in self.batch_updates:
+                formatted_state_id_batch = self.format_state_id(state_id_batch)
+                q_table_batch = self.scores[domain_batch].get(formatted_state_id_batch)
+
+                if q_table_batch is None:
+                    q_table_batch = np.zeros(len(self.visualizations))
+                    self.scores[domain_batch][formatted_state_id_batch] = q_table_batch
+
+                q_table_batch[action_batch] += self.alpha * (reward_batch - q_table_batch[action_batch])
+
+                # Update nearest neighbors of batched state
+                nearest_keys = self.find_nearest_index(domain_batch, state_id_batch, n_neighbours=5)
+                if nearest_keys:
+                    for nearest_key in nearest_keys:
+                        formatted_neighbor = self.format_state_id(nearest_key)
+                        neighbor_q_table = self.scores[domain_batch].get(formatted_neighbor)
+                        if neighbor_q_table is not None:
+                            neighbor_q_table[action_batch] += self.alpha * (reward_batch - neighbor_q_table[action_batch])
+
+            self.batch_updates = []
             self.log_update()
-
-        if random.uniform(0, 1) < self.epsilon:
-            return random.randint(0, len(q_table) - 1), True
-        else:
-            return np.argmax(q_table), False
-
-    def update_q_value(self, domain, state_id, action, reward, require_feedback):
-        if not self.domains or not self.visualizations:
-            raise ValueError("Both domains and visualizations must be defined before choosing an action.")
-
-        if require_feedback:
-            self.batch_updates.append((domain, state_id, action, reward))
-
-            if len(self.batch_updates) >= self.batch_size:
-                for domain, state_id, action, reward in self.batch_updates:
-                    formatted_state_id = self.format_state_id(state_id)
-                    q_table = self.scores[domain].get(formatted_state_id)
-
-                    if q_table is None:
-                        q_table = np.zeros(len(self.visualizations))
-                        self.scores[domain][formatted_state_id] = q_table
-
-                    q_table[action] += self.alpha * (reward - q_table[action])
-
-                self.batch_updates = []
-                self.log_update()
-                self.alpha = max(self.min_alpha, self.alpha * self.decay_rate)
+            self.alpha = max(self.min_alpha, self.alpha * self.alpha_decay)
+            self.epsilon = max(self.min_epsilon, self.epsilon * self.epsilon_decay)
+            self.log_update()
 
     def log_update(self):
         """
-        Logs the updated values to the database (json file in this case)
+        Logs the updated Q-table to the JSON file.
+
+        Raises:
+        RuntimeError: If the Q-table file cannot be written.
         """
         scores_serializable = {
             domain: {
-                ','.join(map(str, state_id)): q_table.tolist() for state_id, q_table in domain_q.items()
+                state_id: q_table.tolist() for state_id, q_table in domain_q.items()
             } for domain, domain_q in self.scores.items()
         }
         
@@ -169,7 +247,7 @@ class RecommendationAgent:
 
     def add_domain(self, domain):
         """
-        Adds a domain to the list of domains.
+        Adds a domain to the list of domains if it doesn't already exist.
 
         Parameters:
         domain (str): The domain to add.
@@ -177,21 +255,30 @@ class RecommendationAgent:
         if not self.has_domain(domain):
             self.domains.append(domain)
             self.scores[domain] = {}
-            self.indexes[domain] = Index(Space.Euclidean, num_dimensions=self.n_statistics)
+            self.indexes[domain] = Index(Space.Cosine, num_dimensions=self.n_statistics, storage_data_type=StorageDataType.Float32)
             self.log_update()
 
     def has_domain(self, domain):
         """
-        Checks if a domain exists
+        Checks if a domain exists.
+
+        Parameters:
+        domain (str): The domain to check.
+
+        Returns:
+        bool: True if the domain exists, False otherwise.
         """
         return domain in self.domains
 
     def add_visualization(self, new_option):
         """
-        Adds a visualization to the list of visualizations.
+        Adds a visualization to the list of visualizations if it doesn't already exist.
 
         Parameters:
         new_option (str): The visualization to add.
+
+        Raises:
+        ValueError: If domains are not defined.
         """
         if not self.domains:
             raise ValueError("Domain must be defined in order to add visualizations")
@@ -211,9 +298,13 @@ class RecommendationAgent:
 
         Parameters:
         domain (str): The domain.
-        state_id (bytes): The state ID.
+        state_id (tuple): The state ID.
         """
-        self.indexes[domain].add_item(list(state_id))
+        formatted_id = self.format_state_id(state_id)
+        id = self.indexes[domain].add_item(list(state_id))
+        vec = self.indexes[domain].get_vector(id)
+        self.index_lookup[formatted_id] = vec
+
 
     def find_nearest_index(self, domain, state_id, n_neighbours=1):
         """
@@ -221,23 +312,31 @@ class RecommendationAgent:
 
         Parameters:
         domain (str): The domain.
-        state_id (bytes): The state ID.
+        state_id (tuple): The state ID.
+        n_neighbours (int): The number of nearest neighbors to find.
 
         Returns:
-        bytes: The nearest state ID.
+        list: List of tuples representing the nearest state IDs.
         """
         try:
             neighbors, _ = self.indexes[domain].query(np.array(list(state_id), dtype=np.float32), k=n_neighbours)
 
             if neighbors.any():
                 value_array = self.indexes[domain].get_vectors(neighbors)
-                return [tuple(val[:self.n_statistics]) for val in value_array]
+                
+                neighbour_vectors = []
+                for neighbour in value_array:
+                    neighbour_vec = next((key for key, value in self.index_lookup.items() if np.array_equal(value, neighbour)), None)
+                    vec = [float(numeric_string) for numeric_string in neighbour_vec.split(',')]
+                    neighbour_vectors.append(vec)
+                
+                return [tuple(val[:self.n_statistics]) for val in neighbour_vectors]
             else:
                 return None
         except RuntimeError or TypeError:
             return None
 
-    def export_index(self, folder='model/indexes/'):
+    def export_index(self, folder='model/indices/'):
         """
         Exports indices to a .voy file.
 
