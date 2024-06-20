@@ -10,7 +10,7 @@ class RecommendationAgent:
             alpha=0.1,
             min_alpha=0.05,
             alpha_decay=0.99,
-            epsilon=0.5,
+            epsilon=0.3,
             min_epsilon=0.1,
             epsilon_decay=0.99,
             n_statistics=4,
@@ -95,7 +95,6 @@ class RecommendationAgent:
         """
         values = list(statistics.values())
 
-        # Add padding if not enough statistics
         if len(values) < self.n_statistics:
             values.extend([0.0] * (self.n_statistics - len(values)))
 
@@ -113,7 +112,7 @@ class RecommendationAgent:
         """
         return ','.join(f"{val:.1f}" for val in state_id)
 
-    def recommend_visualization(self, domain, state_id):
+    def recommend_visualization(self, domain, state_id, greedy=False):
         """
         Recommends a visualization for a given domain and state ID.
 
@@ -130,20 +129,17 @@ class RecommendationAgent:
         if not self.domains or not self.visualizations:
             raise ValueError("Both domains and visualizations must be defined before choosing an action.")
 
-        # Format state id as string and get scores list
-        formatted_state_id = self.format_state_id(state_id)
-        q_table = self.scores[domain].get(formatted_state_id)
-        print('formatted_state_id, q_table', state_id, formatted_state_id, q_table)
-
-        if q_table is None:
-            q_table = self.initialize_q_table(domain, state_id)
+        nearest_keys = self.find_nearest_index(domain, state_id, n_neighbours=10)
+        if nearest_keys is None:
+            q_table = np.zeros(len(self.visualizations))
+        else:
+            neighbour_scores = [self.scores[domain][self.format_state_id(neighbour)] for neighbour in nearest_keys]
+            q_table = np.array([sum(col) / len(col) for col in zip(*neighbour_scores)])
 
         # Choose either an exploitation or exploration step
-        if random.uniform(0, 1) < self.epsilon:
-            print('exploration step')
+        if (random.uniform(0, 1) < self.epsilon) and not greedy:
             return random.randint(0, len(q_table) - 1)
         else:
-            print('exploitation step')
             return np.argmax(q_table)
 
     def initialize_q_table(self, domain, state_id):
@@ -160,30 +156,16 @@ class RecommendationAgent:
         nearest_keys = self.find_nearest_index(domain, state_id, n_neighbours=10)
 
         if nearest_keys is None:
-            q_table = np.random.uniform(0.1, 0.2, len(self.visualizations))
+            q_table = np.zeros(len(self.visualizations))
         else:
             neighbour_scores = [self.scores[domain][self.format_state_id(neighbour)] for neighbour in nearest_keys]
             q_table = np.array([sum(col) / len(col) for col in zip(*neighbour_scores)])
 
         self.add_index(domain, state_id)
         self.scores[domain][self.format_state_id(state_id)] = q_table
-        self.log_update()
-
         return q_table
     
     def update_q_value(self, domain, state_id, action, reward):
-        """
-        Updates the Q-value for a given state-action pair.
-
-        Parameters:
-        domain (str): The domain for the state-action pair.
-        state_id (tuple): The state ID representing the current state.
-        action (int): The index of the action taken.
-        reward (float): The reward received for the action.
-
-        Raises:
-        ValueError: If domains or visualizations are not defined.
-        """
         if not self.domains or not self.visualizations:
             raise ValueError("Both domains and visualizations must be defined before choosing an action.")
 
@@ -191,40 +173,39 @@ class RecommendationAgent:
         q_table = self.scores[domain].get(formatted_state_id)
 
         if q_table is None:
-            q_table = np.zeros(len(self.visualizations))
-            self.scores[domain][formatted_state_id] = q_table
+            q_table = self.initialize_q_table(domain, state_id)
 
         q_table[action] += self.alpha * (reward - q_table[action])
-
+        q_table[action] = np.clip(q_table[action], -3, 3)
+        
         self.batch_updates.append((domain, state_id, action, reward))
 
-        # Update nearest neighbors in batch mode
         if len(self.batch_updates) >= self.batch_size:
-            for domain_batch, state_id_batch, action_batch, reward_batch in self.batch_updates:
-                formatted_state_id_batch = self.format_state_id(state_id_batch)
-                q_table_batch = self.scores[domain_batch].get(formatted_state_id_batch)
+            self.process_batch_updates()
 
-                if q_table_batch is None:
-                    q_table_batch = np.zeros(len(self.visualizations))
-                    self.scores[domain_batch][formatted_state_id_batch] = q_table_batch
+    def process_batch_updates(self):
+        """
+        Processes batch updates for the Q-values.
+        """
+        for domain, state_id, action, reward in self.batch_updates:
+            self.update_nearest_neighbors(domain, state_id, action, reward)
+        
+        self.batch_updates = []
+        self.log_update()
+        self.alpha = max(self.min_alpha, self.alpha * self.alpha_decay)
+        self.epsilon = max(self.min_epsilon, self.epsilon * self.epsilon_decay)
+    
+    def update_nearest_neighbors(self, domain, state_id, action, reward):
+        nearest_keys = self.find_nearest_index(domain, state_id, n_neighbours=11)
 
-                q_table_batch[action_batch] += self.alpha * (reward_batch - q_table_batch[action_batch])
-
-                # Update nearest neighbors of batched state
-                nearest_keys = self.find_nearest_index(domain_batch, state_id_batch, n_neighbours=5)
-                if nearest_keys:
-                    for nearest_key in nearest_keys:
-                        formatted_neighbor = self.format_state_id(nearest_key)
-                        neighbor_q_table = self.scores[domain_batch].get(formatted_neighbor)
-                        if neighbor_q_table is not None:
-                            neighbor_q_table[action_batch] += self.alpha * (reward_batch - neighbor_q_table[action_batch])
-
-            self.batch_updates = []
-            self.log_update()
-            self.alpha = max(self.min_alpha, self.alpha * self.alpha_decay)
-            self.epsilon = max(self.min_epsilon, self.epsilon * self.epsilon_decay)
-            self.log_update()
-
+        if nearest_keys:
+            for nearest_key in nearest_keys:
+                formatted_neighbor = self.format_state_id(nearest_key)
+                neighbor_q_table = self.scores[domain].get(formatted_neighbor)
+                if neighbor_q_table is not None:
+                    neighbor_q_table[action] += self.alpha * (reward - neighbor_q_table[action])
+                    neighbor_q_table[action] = np.clip(neighbor_q_table[action], -3, 3)
+    
     def log_update(self):
         """
         Logs the updated Q-table to the JSON file.
@@ -256,7 +237,6 @@ class RecommendationAgent:
             self.domains.append(domain)
             self.scores[domain] = {}
             self.indexes[domain] = Index(Space.Cosine, num_dimensions=self.n_statistics, storage_data_type=StorageDataType.Float32)
-            self.log_update()
 
     def has_domain(self, domain):
         """
