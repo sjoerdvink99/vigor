@@ -8,16 +8,16 @@ class RecommendationAgent:
     def __init__(
             self,
             alpha=0.1,
-            min_alpha=0.05,
-            alpha_decay=0.99,
-            epsilon=0.3,
+            min_alpha=0.1,
+            alpha_decay=1,
+            epsilon=0.1,
             min_epsilon=0.1,
-            epsilon_decay=0.99,
+            epsilon_decay=1,
             n_statistics=4,
             domains=None,
             visualizations=None,
             q_table_path=None,
-            batch_size=10,
+            batch_size=100,
         ):
         """
         Initializes the RecommendationAgent.
@@ -129,7 +129,7 @@ class RecommendationAgent:
         if not self.domains or not self.visualizations:
             raise ValueError("Both domains and visualizations must be defined before choosing an action.")
 
-        nearest_keys = self.find_nearest_index(domain, state_id, n_neighbours=10)
+        nearest_keys = self.find_nearest_index(domain, state_id, n_neighbours=20)
         if nearest_keys is None:
             q_table = np.zeros(len(self.visualizations))
         else:
@@ -196,7 +196,7 @@ class RecommendationAgent:
         self.epsilon = max(self.min_epsilon, self.epsilon * self.epsilon_decay)
     
     def update_nearest_neighbors(self, domain, state_id, action, reward):
-        nearest_keys = self.find_nearest_index(domain, state_id, n_neighbours=11)
+        nearest_keys = self.find_nearest_index(domain, state_id, n_neighbours=20)
 
         if nearest_keys:
             for nearest_key in nearest_keys:
