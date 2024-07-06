@@ -10,6 +10,8 @@ Sjoerd Vink
 
 This repository is part of the thesis project of the Applied Data Science Masters at Utrecht University. The system is designed to recommend visualizations based on input statistics derived from a knowledge graph (KG).
 
+The input dimensions can be found here: [Descriptive Statistics](https://git.science.uu.nl/graphpolaris/experiments/descriptive-analytics)
+
 ## Usage
 
 ```

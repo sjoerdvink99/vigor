@@ -176,7 +176,7 @@ class RecommendationAgent:
             q_table = self.initialize_q_table(domain, state_id)
 
         q_table[action] += self.alpha * (reward - q_table[action])
-        q_table[action] = np.clip(q_table[action], -3, 3)
+        q_table[action] = np.clip(q_table[action], -4, 4)
         
         self.batch_updates.append((domain, state_id, action, reward))
 
@@ -204,7 +204,7 @@ class RecommendationAgent:
                 neighbor_q_table = self.scores[domain].get(formatted_neighbor)
                 if neighbor_q_table is not None:
                     neighbor_q_table[action] += self.alpha * (reward - neighbor_q_table[action])
-                    neighbor_q_table[action] = np.clip(neighbor_q_table[action], -3, 3)
+                    neighbor_q_table[action] = np.clip(neighbor_q_table[action], -4, 4)
     
     def log_update(self):
         """
