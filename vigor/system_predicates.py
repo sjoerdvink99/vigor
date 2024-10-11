@@ -1,4 +1,4 @@
-from vigor.visualization_types import VisualizationType
+from .visualization_types import VisualizationType
 
 # How well does it support it, visualization, statistic, min, max
 predicates = [

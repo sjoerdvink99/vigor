@@ -2,7 +2,7 @@ import networkx as nx
 from typing import Dict, Any, List
 from dataclasses import dataclass, field
 from networkx.algorithms.community import girvan_newman, modularity
-from vigor.utils import is_spatial, is_temporal
+from .utils import is_spatial, is_temporal
 
 @dataclass
 class Graph(nx.Graph):
@@ -52,16 +52,25 @@ class Graph(nx.Graph):
     def calculate_modularity(self) -> float:
         """Calculate modularity based on detected communities."""
         try:
+            # Check if the graph has enough nodes and edges
+            if self.number_of_edges() == 0 or self.number_of_nodes() == 0:
+                raise ValueError("Graph must have at least one edge and one node to calculate modularity.")
+            
             # Detect communities using the Girvan-Newman method
             communities_generator = girvan_newman(self)
-            top_level_communities = next(communities_generator)
+            top_level_communities = next(communities_generator, None)
+            
+            # Ensure that communities were detected
+            if not top_level_communities:
+                raise ValueError("No communities were detected.")
+            
             communities = tuple(sorted(c) for c in top_level_communities)
 
             # Calculate modularity based on the detected communities
             return modularity(self, communities)
         except Exception as e:
             print(f"Error calculating modularity: {e}")
-            return float('nan')
+            return 0
 
     def extract_statistics(self) -> None:
         """Extract statistics from the graph."""
