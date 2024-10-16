@@ -4,3 +4,4 @@ model/
 __pycache__/
 __pycache__
 vigor.egg-info/
+archive/
