@@ -5,3 +5,4 @@ __pycache__/
 __pycache__
 vigor.egg-info/
 archive/
+.DS_Store
