@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from vigor.visualization_types import VisualizationType
-from vigor.model.predicate import Predicate
+from vigor.predicate import Predicate
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -16,10 +16,10 @@ class Visualization:
     def add_predicate(self, predicate: Predicate) -> None:
         self.predicates.append(predicate)
 
-    def compute_score(self, stats: Dict[str, float]) -> float:
+    def compute_relevance(self, stats: Dict[str, float]) -> float:
         """Compute total score based on the evaluation of predicates."""
-        scores = np.array([predicate.evaluate(stats.get(predicate.statistic, 0)) for predicate in self.predicates])
-        return np.sum(scores) / len(self.predicates)  # Average score of all predicates
+        scores = np.array([predicate.relevance(stats.get(predicate.statistic, 0)) for predicate in self.predicates])
+        return np.sum(scores) / len(self.predicates)
 
     def update(self, feedback: int, stats: Dict[str, float], n_iter: int = 1000):
         """Update predicate scores using feedback as reward"""

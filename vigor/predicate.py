@@ -7,7 +7,7 @@ class Predicate:
         self.statistic = statistic
         self.score = score
 
-    def evaluate(self, value: float) -> float:
+    def relevance(self, value: float) -> float:
         """Returns a score based on the evaluation of the statistic."""
         if value < self.min or value > self.max:
             return 0
