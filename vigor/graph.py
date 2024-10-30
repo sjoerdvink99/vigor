@@ -3,37 +3,44 @@ from typing import Dict, Any, List
 from dataclasses import dataclass, field
 from networkx.algorithms.community import girvan_newman, modularity
 from .utils import is_spatial, is_temporal
+from statistics import stdev
 
 @dataclass
 class Graph(nx.Graph):
-    # Topological Measures
-    n_nodes: int = field(init=False)
-    n_edges: int = field(init=False)
-    density: float = field(init=False)
-    n_components: int = field(init=False)
-    diameter: int = field(init=False)
-    avg_shortest_path_length: float = field(init=False)
-    transitivity: float = field(init=False)
-    is_bipartite: int = field(init=False)
-    is_directed_int: int = field(init=False)
+    # Overview
     graph_type: int = field(init=False)
+    is_directed_int: int = field(init=False)
     has_spatial_attributes: int = field(init=False)
     has_temporal_attributes: int = field(init=False)
-    eccentricity_avg: float = field(init=False)
-    radius: int = field(init=False)
-    modularity: float = field(init=False)
+    is_planar: int = field(init=False)
+    is_bipartite: int = field(init=False)
 
-    # Node Measures
+    # Topology
+    n_components: int = field(init=False)
+    avg_betweenness_centrality: float = field(init=False)
+    avg_closeness_centrality: float = field(init=False)
+    avg_eigenvector_centrality: float = field(init=False)
+    avg_degree: float = field(init=False)
+    std_degree: float = field(init=False)
+    clustering_coefficient: float = field(init=False)
+    transitivity: float = field(init=False)
+    modularity: float = field(init=False)
+    communities: int = field(init=False)
+    avg_shortest_path_length: float = field(init=False)
+    radius: int = field(init=False)
+    diameter: int = field(init=False)
+    assortativity: float = field(init=False)
+    vertex_connectivity: float = field(init=False)
+    eccentricity_avg: float = field(init=False)
+    s_metric: float = field(init=False)
+    sigma: float = field(init=False)
+    
+    # Node/Edge
+    n_nodes: int = field(init=False)
     node_types: int = field(init=False)
     node_attributes: int = field(init=False)
-    avg_degree: float = field(init=False)
-    max_degree: int = field(init=False)
-    min_degree: int = field(init=False)
-    clustering_coefficient: float = field(init=False)
-    assortativity: float = field(init=False)
-    avg_betweenness_centrality: float = field(init=False)
-
-    # Edge Measures
+    number_of_isolates: int = field(init=False)
+    density: float = field(init=False)
     edge_types: int = field(init=False)
     edge_attributes: int = field(init=False)
     n_parallel_edges: int = field(init=False)
@@ -65,6 +72,7 @@ class Graph(nx.Graph):
                 raise ValueError("No communities were detected.")
             
             communities = tuple(sorted(c) for c in top_level_communities)
+            self.communities = len(communities)
 
             # Calculate modularity based on the detected communities
             return modularity(self, communities)
@@ -102,27 +110,44 @@ class Graph(nx.Graph):
         elif self.n_nodes == self.n_edges and all(degree == 2 for _, degree in self.degree()):
             self.graph_type = 2  # Cycle
         else:
-            self.graph_type = 3  # General
+            self.graph_type = 3 if self.density <= 0.1 else 4
 
         # Node Measures
-        node_types_set = {data.get('type') for _, data in self.nodes(data=True) if 'type' in data}
+        node_types_set = {",".join(data['label']) if isinstance(data['label'], list) else data['label'] 
+                  for _, data in self.nodes(data=True) if 'label' in data}
         self.node_types = len(node_types_set)
-        self.node_attributes = sum(len(data) for _, data in self.nodes(data=True))
+
+        # Calculate the average number of attributes per node
+        total_node_attributes = sum(len(data) for _, data in self.nodes(data=True))
+        self.node_attributes = total_node_attributes / self.n_nodes if self.n_nodes > 0 else 0
 
         degrees = [degree for _, degree in self.degree()]
         self.avg_degree = sum(degrees) / self.n_nodes if self.n_nodes > 0 else 0
-        self.max_degree = max(degrees) if degrees else 0
-        self.min_degree = min(degrees) if degrees else 0
+        self.std_degree = stdev(degrees) if len(degrees) > 1 else 0
         self.clustering_coefficient = nx.average_clustering(self)
+        self.vertex_connectivity = nx.node_connectivity(self)
+        self.s_metric = nx.s_metric(self) if nx.is_connected(self) else -1
+        self.sigma = nx.sigma(self) if nx.is_connected(self) else -1
+        self.is_planar = 1 if nx.is_planar(self) else 0
+        self.number_of_isolates = nx.number_of_isolates(self)
 
         # Betweenness centrality
         betweenness = nx.betweenness_centrality(self)
         self.avg_betweenness_centrality = sum(betweenness.values()) / len(betweenness) if betweenness else 0.0
+        
+        closeness = nx.closeness_centrality(self)
+        self.avg_closeness_centrality = sum(closeness.values()) / len(closeness) if closeness else 0.0
+
+        eigenvector = nx.eigenvector_centrality(self)
+        self.avg_eigenvector_centrality = sum(eigenvector.values()) / len(eigenvector) if eigenvector else 0.0
 
         # Edge Measures
         edge_types_set = {data.get('type') for _, _, data in self.edges(data=True) if 'type' in data}
         self.edge_types = len(edge_types_set)
-        self.edge_attributes = sum(len(data) for _, _, data in self.edges(data=True))
+        
+        # Calculate the average number of attributes per edge
+        total_edge_attributes = sum(len(data) for _, _, data in self.edges(data=True))
+        self.edge_attributes = total_edge_attributes / self.n_edges if self.n_edges > 0 else 0
 
         self.n_self_loops = nx.number_of_selfloops(self)
         self.n_parallel_edges = sum(1 for u, v, k in self.edges(keys=True) if self.number_of_edges(u, v) > 1) if isinstance(self, (nx.MultiGraph, nx.MultiDiGraph)) else 0
@@ -130,7 +155,7 @@ class Graph(nx.Graph):
         # Assortativity
         if self.n_edges > 0:
             try:
-                self.assortativity = nx.degree_assortativity_coefficient(self)
+                self.assortativity = float(nx.degree_assortativity_coefficient(self))
             except Exception as e:
                 print(f"Error calculating assortativity: {e}")
                 self.assortativity = float('nan')
