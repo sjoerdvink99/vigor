@@ -40,9 +40,9 @@ class Visualization:
             loss.backward()
             optimizer.step()
 
-        self._apply_learned_thresholds(a, mu)
+        self._reparameterize(a, mu)
 
-    def _apply_learned_thresholds(self, a: torch.Tensor, mu: torch.Tensor) -> None:
+    def _reparameterize(self, a: torch.Tensor, mu: torch.Tensor) -> None:
         """Adjust predicates based on learned a and mu."""
         for i, predicate in enumerate(self.predicates):
             predicate.mu = mu[i].item()
