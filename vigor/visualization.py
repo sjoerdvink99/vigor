@@ -24,7 +24,7 @@ class Visualization:
     def update(self, feedback: int, stats: Dict[str, float], n_iter: int = 1000):
         """Update predicate scores using feedback as reward"""
         x = torch.from_numpy(np.array([[stats[p.statistic] for p in self.predicates]])).float().to(device)
-        x = torch.cat([x, torch.rand(x.shape[0], 1)], dim=1)
+        # x = torch.cat([x, torch.rand(x.shape[0], 1)], dim=1)
         feedback_tensor = torch.tensor([feedback], dtype=torch.float32, device=device).view(1, 1)
 
         a = torch.tensor([p.a for p in self.predicates], requires_grad=True, device=device)
