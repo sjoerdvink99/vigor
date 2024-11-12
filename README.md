@@ -2,7 +2,7 @@
 
 ## Authors
 
-Sjoerd Vink
+Sjoerd Vink, Brian Montambalt, Mingwei Li
 
 ## Description
 
