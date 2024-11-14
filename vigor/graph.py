@@ -12,7 +12,6 @@ class Graph(nx.Graph):
     is_directed_int: int = field(init=False)
     has_spatial_attributes: int = field(init=False)
     has_temporal_attributes: int = field(init=False)
-    is_planar: int = field(init=False)
     is_bipartite: int = field(init=False)
 
     # Topology
@@ -32,8 +31,6 @@ class Graph(nx.Graph):
     assortativity: float = field(init=False)
     vertex_connectivity: float = field(init=False)
     eccentricity_avg: float = field(init=False)
-    s_metric: float = field(init=False)
-    sigma: float = field(init=False)
     
     # Node/Edge
     n_nodes: int = field(init=False)
@@ -126,9 +123,6 @@ class Graph(nx.Graph):
         self.std_degree = stdev(degrees) if len(degrees) > 1 else 0
         self.clustering_coefficient = nx.average_clustering(self)
         self.vertex_connectivity = nx.node_connectivity(self)
-        self.s_metric = nx.s_metric(self) if nx.is_connected(self) else -1
-        self.sigma = nx.sigma(self) if nx.is_connected(self) else -1
-        self.is_planar = 1 if nx.is_planar(self) else 0
         self.number_of_isolates = nx.number_of_isolates(self)
 
         # Betweenness centrality
