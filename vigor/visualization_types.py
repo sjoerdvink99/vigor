@@ -1,11 +1,10 @@
 from enum import Enum
 
 class VisualizationType(Enum):
-  NODE_LINK = "Node-Link"
-  SEMANTIC_SUBSTRATES = "Semantic Substrates"
-  ATTRIBUTE_DRIVEN_NODELINK = "Attribute Driven Positioning"
-  ADJACENCY_MATRIX = "Adjacency Matrix"
-  QUILTS = "Quilts"
-  BIOFABRIC = "BioFabric"
+  NODELINK = "Node-Link"
+  MATRIX = "Matrix"
+  NODETRIX = "NodeTrix"
+  NODELINK_MAP = "Node-Link-Map"
+  PAOHVIS = "PaohVis"
+  CHORD_DIAGRAM = "Chord Diagram"
   TREEMAP = "Treemap"
-  SUNBURST = "Sunburst"
