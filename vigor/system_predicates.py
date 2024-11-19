@@ -64,3 +64,7 @@ predicates = [
     (VisualizationType.TREEMAP, 'components', 1, 1),
     (VisualizationType.TREEMAP, 'is_spatial', 0, 1)
 ]
+
+nobre = [
+    (VisualizationType.NODELINK, 'density', 0, 0.1), # ...
+]
