@@ -11,13 +11,12 @@ def generate_graphs(n_graphs, nodes_min=2, nodes_max=200):
     graphs = []
     for i in range(n_graphs):
         n = np.random.randint(nodes_min, nodes_max)
-        p = np.random.uniform(0, 1)
+        p = np.random.uniform(0, 0.5)
         G = Graph()
         G.from_existing_graph(nx.fast_gnp_random_graph(n, p))
 
         try:
-            G.extract_statistics()
-            statistics = G.get_statistics()
+            statistics = G.get_statistics(testing=True)
             print("Generated statistics for graph", i, statistics)
             graphs.append(statistics)
         except:

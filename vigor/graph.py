@@ -1,4 +1,5 @@
 import networkx as nx
+import random
 from typing import Dict, Any, List
 from dataclasses import dataclass, field
 from networkx.algorithms.community import girvan_newman, modularity
@@ -77,15 +78,22 @@ class Graph(nx.Graph):
             print(f"Error calculating modularity: {e}")
             return 0
 
-    def extract_statistics(self) -> None:
+    def extract_statistics(self, testing=False) -> None:
         """Extract statistics from the graph."""
         # Topological Measures
         self.n_nodes = self.number_of_nodes()
         self.n_edges = self.number_of_edges()
-        self.is_bipartite = 1 if nx.is_bipartite(self) else 0
-        self.is_directed_int = int(self.is_directed())
+        
+        if testing:
+            self.is_directed_int = random.randint(0, 1)
+            self.is_bipartite = random.randint(0, 1)
+            self.n_components = random.randint(0, 10)
+        else:
+            self.is_bipartite = 1 if nx.is_bipartite(self) else 0
+            self.is_directed_int = int(self.is_directed())
+            self.n_components = nx.number_weakly_connected_components(self) if self.is_directed() else nx.number_connected_components(self)
+        
         self.density = nx.density(self)
-        self.n_components = nx.number_weakly_connected_components(self) if self.is_directed() else nx.number_connected_components(self)
         self.transitivity = nx.transitivity(self)
 
         # If the graph is connected, calculate diameter, radius, and shortest path length
@@ -110,13 +118,17 @@ class Graph(nx.Graph):
             self.graph_type = 3 if self.density <= 0.1 else 4
 
         # Node Measures
-        node_types_set = {",".join(data['label']) if isinstance(data['label'], list) else data['label'] 
-                  for _, data in self.nodes(data=True) if 'label' in data}
-        self.node_types = len(node_types_set)
+        if testing:
+            self.node_types = random.randint(1, 5)
+            self.node_attributes = random.randint(0, 15)
+        else:
+            node_types_set = {",".join(data['label']) if isinstance(data['label'], list) else data['label'] 
+                    for _, data in self.nodes(data=True) if 'label' in data}
+            self.node_types = len(node_types_set)
 
-        # Calculate the average number of attributes per node
-        total_node_attributes = sum(len(data) for _, data in self.nodes(data=True))
-        self.node_attributes = total_node_attributes / self.n_nodes if self.n_nodes > 0 else 0
+            # Calculate the average number of attributes per node
+            total_node_attributes = sum(len(data) for _, data in self.nodes(data=True))
+            self.node_attributes = total_node_attributes / self.n_nodes if self.n_nodes > 0 else 0
 
         degrees = [degree for _, degree in self.degree()]
         self.avg_degree = sum(degrees) / self.n_nodes if self.n_nodes > 0 else 0
@@ -136,15 +148,23 @@ class Graph(nx.Graph):
         self.avg_eigenvector_centrality = sum(eigenvector.values()) / len(eigenvector) if eigenvector else 0.0
 
         # Edge Measures
-        edge_types_set = {data.get('type') for _, _, data in self.edges(data=True) if 'type' in data}
-        self.edge_types = len(edge_types_set)
+        if testing:
+            self.edge_types = random.randint(1, 5)
+            self.edge_attributes = random.randint(0, 15)
+        else:
+            edge_types_set = {data.get('type') for _, _, data in self.edges(data=True) if 'type' in data}
+            self.edge_types = len(edge_types_set)
         
-        # Calculate the average number of attributes per edge
-        total_edge_attributes = sum(len(data) for _, _, data in self.edges(data=True))
-        self.edge_attributes = total_edge_attributes / self.n_edges if self.n_edges > 0 else 0
+            # Calculate the average number of attributes per edge
+            total_edge_attributes = sum(len(data) for _, _, data in self.edges(data=True))
+            self.edge_attributes = total_edge_attributes / self.n_edges if self.n_edges > 0 else 0
 
-        self.n_self_loops = nx.number_of_selfloops(self)
-        self.n_parallel_edges = sum(1 for u, v, k in self.edges(keys=True) if self.number_of_edges(u, v) > 1) if isinstance(self, (nx.MultiGraph, nx.MultiDiGraph)) else 0
+        if testing:
+            self.n_self_loops = random.randint(0, 5)
+            self.n_parallel_edges = random.randint(0, 5)
+        else:
+            self.n_self_loops = nx.number_of_selfloops(self)
+            self.n_parallel_edges = sum(1 for u, v, k in self.edges(keys=True) if self.number_of_edges(u, v) > 1) if isinstance(self, (nx.MultiGraph, nx.MultiDiGraph)) else 0
 
         # Assortativity
         if self.n_edges > 0:
@@ -156,18 +176,22 @@ class Graph(nx.Graph):
         else:
             self.assortativity = float('nan')
 
-        # Check for spatial and temporal attributes using utility functions
-        self.has_spatial_attributes = int(any(
-            is_spatial(key) for _, data in self.nodes(data=True) for key in data.keys()
-        ) or any(
-            is_spatial(key) for _, _, data in self.edges(data=True) for key in data.keys()
-        ))
+        if testing:
+            self.has_spatial_attributes = random.randint(0, 1)
+            self.has_temporal_attributes = random.randint(0, 1)
+        else:
+            # Check for spatial and temporal attributes using utility functions
+            self.has_spatial_attributes = int(any(
+                is_spatial(key) for _, data in self.nodes(data=True) for key in data.keys()
+            ) or any(
+                is_spatial(key) for _, _, data in self.edges(data=True) for key in data.keys()
+            ))
 
-        self.has_temporal_attributes = int(any(
-            is_temporal(key) for _, data in self.nodes(data=True) for key in data.keys()
-        ) or any(
-            is_temporal(key) for _, _, data in self.edges(data=True) for key in data.keys()
-        ))
+            self.has_temporal_attributes = int(any(
+                is_temporal(key) for _, data in self.nodes(data=True) for key in data.keys()
+            ) or any(
+                is_temporal(key) for _, _, data in self.edges(data=True) for key in data.keys()
+            ))
 
         try:
             self.modularity = self.calculate_modularity()
@@ -180,9 +204,9 @@ class Graph(nx.Graph):
         self.extract_statistics()
         return getattr(self, name, None)
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self, testing=False) -> Dict[str, Any]:
         """Convert the statistics to a dictionary format."""
-        self.extract_statistics()
+        self.extract_statistics(testing)
         return {field_name: getattr(self, field_name) for field_name in self.__dataclass_fields__}
 
     def get_statistics_values(self) -> List[Any]:

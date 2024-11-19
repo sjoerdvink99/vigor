@@ -74,25 +74,25 @@ nobre = [
     (NobreVisualizations.NODELINK, 'edge_types', 1, 1),
 
     # Attribute-driven positioning
-    (NobreVisualizations.ATTRIBUTE_POSITIONING, 'n_nodes', 0, 100),
-    (NobreVisualizations.ATTRIBUTE_POSITIONING, 'graph_type', 1, 1),
-    (NobreVisualizations.ATTRIBUTE_POSITIONING, 'graph_type', 3, 3),
-    (NobreVisualizations.ATTRIBUTE_POSITIONING, 'node_attributes', 0, 5),
-    (NobreVisualizations.ATTRIBUTE_POSITIONING, 'node_types', 1, 5),
+    (NobreVisualizations.NODELINK_POSITIONING, 'n_nodes', 0, 100),
+    (NobreVisualizations.NODELINK_POSITIONING, 'graph_type', 1, 1),
+    (NobreVisualizations.NODELINK_POSITIONING, 'graph_type', 3, 3),
+    (NobreVisualizations.NODELINK_POSITIONING, 'node_attributes', 0, 5),
+    (NobreVisualizations.NODELINK_POSITIONING, 'node_types', 1, 5),
 
     # Attribute-driven faceting
-    (NobreVisualizations.ATTRIBUTE_FACETING, 'n_nodes', 0, 100),
-    (NobreVisualizations.ATTRIBUTE_FACETING, 'graph_type', 1, 1),
-    (NobreVisualizations.ATTRIBUTE_FACETING, 'node_attributes', 0, 5),
-    (NobreVisualizations.ATTRIBUTE_FACETING, 'node_types', 1, 1),
+    (NobreVisualizations.NODELINK_FACETING, 'n_nodes', 0, 100),
+    (NobreVisualizations.NODELINK_FACETING, 'graph_type', 1, 1),
+    (NobreVisualizations.NODELINK_FACETING, 'node_attributes', 0, 5),
+    (NobreVisualizations.NODELINK_FACETING, 'node_types', 1, 1),
 
     # Adjacency Matrix
-    (NobreVisualizations.ADJ_MATRIX, 'n_nodes', 0, 100),
-    (NobreVisualizations.ADJ_MATRIX, 'graph_type', 2, 2),
-    (NobreVisualizations.ADJ_MATRIX, 'node_attributes', 5, 10),
-    (NobreVisualizations.ADJ_MATRIX, 'node_types', 1, 1),
-    (NobreVisualizations.ADJ_MATRIX, 'edge_attributes', 0, 3),
-    (NobreVisualizations.ADJ_MATRIX, 'edge_types', 1, 1),
+    (NobreVisualizations.MATRIX, 'n_nodes', 0, 100),
+    (NobreVisualizations.MATRIX, 'graph_type', 2, 2),
+    (NobreVisualizations.MATRIX, 'node_attributes', 5, 10),
+    (NobreVisualizations.MATRIX, 'node_types', 1, 1),
+    (NobreVisualizations.MATRIX, 'edge_attributes', 0, 3),
+    (NobreVisualizations.MATRIX, 'edge_types', 1, 1),
 
     # Quilts
     (NobreVisualizations.QUILTS, 'n_nodes', 0, 100),

@@ -15,6 +15,6 @@ class NobreVisualizations(Enum):
   NODELINK_POSITIONING = "Node-Link Attribute-driven Positioning"
   MATRIX = "Matrix"
   QUILTS = "Quilts"
-  BIOFA = "BioFabric"
+  BIOFABRIC = "BioFabric"
   TREEMAP = "Treemap"
   SUNBURST = "Sunburst"
