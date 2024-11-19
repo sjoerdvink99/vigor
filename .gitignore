@@ -1,4 +1,5 @@
-data/
+data/*
+!data/generated_graphs_example.csv
 .venv/
 __pycache__/
 __pycache__

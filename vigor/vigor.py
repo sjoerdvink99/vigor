@@ -2,7 +2,6 @@ import numpy as np
 from typing import Dict, List, Tuple, Union
 from vigor.visualization import Visualization
 from vigor.visualization_types import VisualizationType
-from textwrap import dedent
 import torch
 from torch import nn
 from torch import optim
