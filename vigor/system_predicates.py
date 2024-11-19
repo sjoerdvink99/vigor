@@ -1,4 +1,4 @@
-from .visualization_types import VisualizationType
+from .visualization_types import VisualizationType, NobreVisualizations
 
 predicates = [
     # Node-Link
@@ -66,5 +66,5 @@ predicates = [
 ]
 
 nobre = [
-    (VisualizationType.NODELINK, 'density', 0, 0.1), # ...
+    (NobreVisualizations.NODELINK, 'density', 0, 0.1), # still have to do this
 ]
