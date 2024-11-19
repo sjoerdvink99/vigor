@@ -55,7 +55,6 @@ def label_graphs(df, predicates, conformance=1):
     return final_labels
 
 def get_predicates(vigor, X, y, n_iter=1000):
-    print("get_predicates", X.values, y[None], X.columns)
     predicates = vigor.compute_predicate_sequence(
         X.values,
         y[None],
@@ -79,8 +78,8 @@ def learn_predicates(df, labels, n_iter=1000):
     pred_list = {}
 
     for visualization in labels.unique():
-        ypos = (labels == visualization).values
-        yneg = ~ypos
+        ypos = (labels == visualization).astype(int).values
+        yneg = (labels != visualization).astype(int).values
         print(f"Learning predicates for {visualization}")
         pred_pos = get_predicates(vigor, graphs_normalized, ypos, n_iter=n_iter)
         pred_neg = get_predicates(vigor, graphs_normalized, yneg, n_iter=n_iter)
