@@ -24,7 +24,7 @@ class VIGOR:
         x = (x - mean) / scale
 
         selection_centroids = torch.stack([x[sel_t].mean(0) for sel_t in selected], 0)
-        selection_std = torch.stack([x[sel_t].std(0) for sel_t in selected], 0)
+        selection_std = torch.stack([x[sel_t].std(0)+1e-4 for sel_t in selected], 0)
 
         a, mu = (1 / selection_std).to(device), selection_centroids.to(device)
         a.requires_grad_(True)
