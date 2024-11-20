@@ -13,20 +13,21 @@ class VIGOR:
         pred = 1 / (1 + ((a.abs() * (x - mu).abs()).pow(b)).sum(1))
         return pred
 
-    def compute_predicate_sequence(self, x0, selected, attribute_names=[], n_iter=1000):
+    def compute_predicate_sequence(self, x0, selected, attribute_names=[], n_iter=1000, eps=1e-2):
         n_points, n_features = x0.shape
 
         vmin, vmax = x0.min(0), x0.max(0)
         x = torch.from_numpy(x0.astype(np.float32)).to(device)
         label = torch.from_numpy(selected).float().to(device)
 
-        mean, scale = x.mean(0), x.std(0) + 1e-2
+        mean, scale = x.mean(0), x.std(0) + eps
         x = (x - mean) / scale
 
         selection_centroids = torch.stack([x[sel_t].mean(0) for sel_t in selected], 0)
-        selection_std = torch.stack([x[sel_t].std(0) for sel_t in selected], 0)
+        selection_std = torch.stack([x[sel_t].std(0) for sel_t in selected], 0) + eps
 
         a, mu = (1 / selection_std).to(device), selection_centroids.to(device)
+        
         a.requires_grad_(True)
         mu.requires_grad_(True)
 
@@ -38,13 +39,19 @@ class VIGOR:
             momentum=0.4,
             nesterov=True,
         )
-
-        self._optimize(selected, x, a, mu, label, bce_per_brush, optimizer, n_iter)
-
+        
+        try:
+            self._optimize(selected, x, a, mu, label, bce_per_brush, optimizer, n_iter)
+            failed = False
+        except:
+            failed = True
+            
         a.detach_()
         mu.detach_()
-
-        return self._generate_predicates(selected, x0, a, mu, mean, scale, vmin, vmax, attribute_names)
+        if failed:
+            return failed, (mu, a)
+        else:
+            return failed, self._generate_predicates(selected, x0, a, mu, mean, scale, vmin, vmax, attribute_names)
 
     def _create_bce_per_brush(self, selected, n_points, x):
         bce_per_brush = []
@@ -70,6 +77,7 @@ class VIGOR:
             total_loss = sum(loss_per_brush) + smoothness_loss
             optimizer.zero_grad()
             total_loss.backward()
+            
             optimizer.step()
             if e % max(1, (n_iter // 10)) == 0:
                 print(f"[{e:>4}] loss {total_loss.item()}")
