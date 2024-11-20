@@ -66,13 +66,23 @@ def get_predicates(vigor, X, y, n_iter=1000):
     p.fit(X)
     return p
 
+def denormalize_predicate(predicate, norm_min, norm_max, epsilon):
+    denormalized_clauses = {}
+    for k,v in predicate.clauses.items():
+        denormalized_clauses[k] = v*(norm_max[k] - norm_min[k] - epsilon) + norm_min[k]
+    new_predicate = predicate.copy()
+    new_predicate.clauses = denormalized_clauses
+    return new_predicate
+
 def learn_predicates(df, labels, n_iter=1000):
     """
     Function to learn predicates from the data
     """
     df = df.loc[:, df.nunique() > 1]
     epsilon = 1e-8  # Small value to avoid division by zero
-    graphs_normalized = (df - df.min()) / (df.max() - df.min() + epsilon)
+    norm_min = df.min()
+    norm_max = df.max()
+    graphs_normalized = (df - norm_min) / (norm_max - norm_min + epsilon)
 
     vigor = VIGOR()
     pred_list = {}
@@ -83,8 +93,8 @@ def learn_predicates(df, labels, n_iter=1000):
         print(f"Learning predicates for {visualization}")
         pred_pos = get_predicates(vigor, graphs_normalized, ypos, n_iter=n_iter)
         pred_neg = get_predicates(vigor, graphs_normalized, yneg, n_iter=n_iter)
-
-        pred_list[visualization] = pred_pos, pred_neg
+        
+        pred_list[visualization] = denormalize_predicate(pred_pos, norm_min, norm_max, epsilon), denormalize_predicate(pred_neg, norm_min, norm_max, epsilon)
 
     return pred_list
 
