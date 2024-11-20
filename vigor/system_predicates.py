@@ -56,7 +56,7 @@ predicates = [
     (VisualizationType.CHORD_DIAGRAM, 'parallel_edges', 0, 5),
 
     # Treemap
-    (VisualizationType.TREEMAP, 'graph_type', 0.5, 1.5),
+    (VisualizationType.TREEMAP, 'graph_type_1', 0.5, 1),
     (VisualizationType.TREEMAP, 'modularity', 0.5, 1),
     (VisualizationType.TREEMAP, 'n_nodes', 50, 200),
     (VisualizationType.TREEMAP, 'node_attributes', 5, 20),
@@ -68,27 +68,28 @@ predicates = [
 nobre = [
     # Node-Link (On-node/edge encoding)
     (NobreVisualizations.NODELINK, 'n_nodes', 0, 100),
-    (NobreVisualizations.NODELINK, 'graph_type', 1, 1),
-    (NobreVisualizations.NODELINK, 'graph_type', 3, 4),
+    (NobreVisualizations.NODELINK, 'graph_type_1', 0.5, 1),
+    (NobreVisualizations.NODELINK, 'graph_type_3', 0.5, 1),
+    (NobreVisualizations.NODELINK, 'graph_type_4', 0.5, 1),
     (NobreVisualizations.NODELINK, 'node_types', 1, 1),
     (NobreVisualizations.NODELINK, 'edge_types', 1, 1),
 
     # Attribute-driven positioning
     (NobreVisualizations.NODELINK_POSITIONING, 'n_nodes', 0, 100),
-    (NobreVisualizations.NODELINK_POSITIONING, 'graph_type', 1, 1),
-    (NobreVisualizations.NODELINK_POSITIONING, 'graph_type', 3, 3),
+    (NobreVisualizations.NODELINK_POSITIONING, 'graph_type_1', 0.5, 1),
+    (NobreVisualizations.NODELINK_POSITIONING, 'graph_type_3', 0.5, 1),
     (NobreVisualizations.NODELINK_POSITIONING, 'node_attributes', 0, 5),
     (NobreVisualizations.NODELINK_POSITIONING, 'node_types', 1, 5),
 
     # Attribute-driven faceting
     (NobreVisualizations.NODELINK_FACETING, 'n_nodes', 0, 100),
-    (NobreVisualizations.NODELINK_FACETING, 'graph_type', 1, 1),
+    (NobreVisualizations.NODELINK_FACETING, 'graph_type_1', 0.5, 1),
     (NobreVisualizations.NODELINK_FACETING, 'node_attributes', 0, 5),
     (NobreVisualizations.NODELINK_FACETING, 'node_types', 1, 1),
 
     # Adjacency Matrix
     (NobreVisualizations.MATRIX, 'n_nodes', 0, 100),
-    (NobreVisualizations.MATRIX, 'graph_type', 2, 2),
+    (NobreVisualizations.MATRIX, 'graph_type_2', 0.5, 1),
     (NobreVisualizations.MATRIX, 'node_attributes', 5, 10),
     (NobreVisualizations.MATRIX, 'node_types', 1, 1),
     (NobreVisualizations.MATRIX, 'edge_attributes', 0, 3),
@@ -96,8 +97,9 @@ nobre = [
 
     # Quilts
     (NobreVisualizations.QUILTS, 'n_nodes', 0, 100),
-    (NobreVisualizations.QUILTS, 'graph_type', 1, 1),
-    (NobreVisualizations.QUILTS, 'graph_type', 3, 4),
+    (NobreVisualizations.QUILTS, 'graph_type_1', 0.5, 1),
+    (NobreVisualizations.QUILTS, 'graph_type_3', 0.5, 1),
+    (NobreVisualizations.QUILTS, 'graph_type_4', 0.5, 1),
     (NobreVisualizations.QUILTS, 'node_attributes', 0, 10),
     (NobreVisualizations.QUILTS, 'node_types', 1, 5),
     (NobreVisualizations.QUILTS, 'edge_attributes', 0, 10),
@@ -105,21 +107,22 @@ nobre = [
 
     # BioFabric
     (NobreVisualizations.BIOFABRIC, 'n_nodes', 0, 100),
-    (NobreVisualizations.BIOFABRIC, 'graph_type', 1, 2),
+    (NobreVisualizations.BIOFABRIC, 'graph_type_1', 0.5, 1),
+    (NobreVisualizations.BIOFABRIC, 'graph_type_2', 0.5, 1),
     (NobreVisualizations.BIOFABRIC, 'node_attributes', 0, 10),
     (NobreVisualizations.BIOFABRIC, 'node_types', 1, 5),
     (NobreVisualizations.BIOFABRIC, 'edge_attributes', 0, 10),
     (NobreVisualizations.BIOFABRIC, 'edge_types', 1, 5),
 
     # Treemap
-    (NobreVisualizations.TREEMAP, 'graph_type', 1, 1),
-    (NobreVisualizations.TREEMAP, 'graph_type', 4, 4),
+    (NobreVisualizations.TREEMAP, 'graph_type_1', 0.5, 1),
+    (NobreVisualizations.TREEMAP, 'graph_type_4', 0.5, 1),
     (NobreVisualizations.TREEMAP, 'node_attributes', 0, 5),
     (NobreVisualizations.TREEMAP, 'node_types', 1, 1),
 
     # Sunburst
-    (NobreVisualizations.SUNBURST, 'graph_type', 1, 1),
-    (NobreVisualizations.SUNBURST, 'graph_type', 4, 4),
+    (NobreVisualizations.SUNBURST, 'graph_type_1', 0.5, 1),
+    (NobreVisualizations.SUNBURST, 'graph_type_4', 0.5, 1),
     (NobreVisualizations.SUNBURST, 'node_attributes', 0, 5),
     (NobreVisualizations.SUNBURST, 'node_types', 1, 1),
 ]
