@@ -8,3 +8,4 @@ archive/
 .DS_Store
 notebooks/graph_data.csv
 notebooks/.ipynb_checkpoints/evaluation-brian-checkpoint.ipynb
+.ipynb_checkpoints/
