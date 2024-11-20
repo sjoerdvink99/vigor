@@ -255,36 +255,42 @@ def compute_predicate_sequence(
     )
 
     # training loop
-    for e in range(n_iter):
-        loss_per_brush = []
-        for t, st in enumerate(selected):  # for each brush, compute loss
-            # TODO try subsample:
-            # use all selected data
-            # randomly sample unselected data with similar size
-            pred = predict(x, a[t], mu[t])
-#             print(pred)
-            loss = bce(pred, label[t])
-            # loss += (mu[t] - selection_centroids[t]).pow(2).mean() * 20
-            loss_per_brush.append(loss)
-            smoothness_loss = 0
-            if len(selected) == 2:
-                smoothness_loss += 5 * (a[1:] - a[:-1]).pow(2).mean()
-                smoothness_loss += 1 * (mu[1:] - mu[:-1]).pow(2).mean()
-            elif len(selected) > 2:
-                smoothness_loss += 500 * (a[1:] - a[:-1]).pow(2).mean()
-                smoothness_loss += 10 * (mu[1:] - mu[:-1]).pow(2).mean()
+    train_res = {}
+    try:
+        for e in range(n_iter):
+            loss_per_brush = []
+            for t, st in enumerate(selected):  # for each brush, compute loss
+                # TODO try subsample:
+                # use all selected data
+                # randomly sample unselected data with similar size
+                pred = predict(x, a[t], mu[t])
+    #             print(pred)
+                loss = bce(pred, label[t])
+                # loss += (mu[t] - selection_centroids[t]).pow(2).mean() * 20
+                loss_per_brush.append(loss)
+                smoothness_loss = 0
+                if len(selected) == 2:
+                    smoothness_loss += 5 * (a[1:] - a[:-1]).pow(2).mean()
+                    smoothness_loss += 1 * (mu[1:] - mu[:-1]).pow(2).mean()
+                elif len(selected) > 2:
+                    smoothness_loss += 500 * (a[1:] - a[:-1]).pow(2).mean()
+                    smoothness_loss += 10 * (mu[1:] - mu[:-1]).pow(2).mean()
 
-        # print('bce', loss_per_brush)
-        # print('smoothness', smoothness_loss.item())
-        # sparsity_loss = 0
-        # sparsity_loss = a.abs().mean() * 100
-        total_loss = sum(loss_per_brush) + smoothness_loss  # + sparsity_loss
-        optimizer.zero_grad()
-        total_loss.backward()
-        optimizer.step()
-        if e % max(1, (n_iter // 10)) == 0:
-            # print(pred.min().item(), pred.max().item())
-            print(f"[{e:>4}] loss {loss.item()}")
+            # print('bce', loss_per_brush)
+            # print('smoothness', smoothness_loss.item())
+            # sparsity_loss = 0
+            # sparsity_loss = a.abs().mean() * 100
+            total_loss = sum(loss_per_brush) + smoothness_loss  # + sparsity_loss
+            optimizer.zero_grad()
+            total_loss.backward()
+            optimizer.step()
+            if e % max(1, (n_iter // 10)) == 0:
+                # print(pred.min().item(), pred.max().item())
+                print(f"[{e:>4}] loss {loss.item()}")
+                train_res[e] = {'params': (mu, a), 'loss': loss, 'total_loss': total_loss}
+    except:
+        return train_res
+            
     a.detach_()
     mu.detach_()
     # plt.stem(a.abs().numpy()); plt.show()
@@ -404,21 +410,19 @@ class Predicate:
         return p1, p2, p1.label(X, col, dim), p2.label(X, col, dim)
 
 def get_predicates(X, y, n_iter=1000):
-    predicates, qualities, parameters = compute_predicate_sequence(
+    res = compute_predicate_sequence(
         X.values,
         y[None],
         attribute_names=X.columns,
         n_iter=n_iter,
     )
-    
-    p = Predicate(predicates[0])
-    p.fit(X)
-    return p
-    
-    sent_norm = (sentences.drop(['id', 'sentence'], axis=1) - X.min()) / (X.max() - X.min())
-    sentence_p = doc_p.copy()
-    sentence_p.fit(sent_norm)
-    return doc_p, sentence_p
+    if type(res)==dict:
+        return res
+    else:
+        predicates, qualities, parameters = res
+        p = Predicate(predicates[0])
+        p.fit(X)
+        return p
 
 def fit_predicates(df, predicates):
     vistype_predicates = {}
