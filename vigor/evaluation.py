@@ -1,4 +1,3 @@
-import random
 import numpy as np
 import pandas as pd
 import networkx as nx
@@ -115,8 +114,6 @@ def learn_predicates(df, labels, n_iter=1000):
         # Denormalize the predicates
         pred_pos = denormalize_predicate(pred_pos, min_vals, max_vals)
         pred_neg = denormalize_predicate(pred_neg, min_vals, max_vals)
-
-        # Save the denormalized predicates
         pred_list[visualization] = (pred_pos, pred_neg)
 
     return pred_list

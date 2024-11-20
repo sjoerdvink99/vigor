@@ -65,7 +65,7 @@ predicates = [
     (VisualizationType.TREEMAP, 'is_spatial', 0, 1)
 ]
 
-nobre = [
+nobre_predicates = [
     # Node-Link (On-node/edge encoding)
     (NobreVisualizations.NODELINK, 'n_nodes', 0, 100),
     (NobreVisualizations.NODELINK, 'graph_type_1', 0.5, 1),
