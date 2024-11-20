@@ -2,6 +2,7 @@ import random
 import numpy as np
 import pandas as pd
 import networkx as nx
+from collections import defaultdict
 from vigor import Graph, Predicate, VIGOR
 
 def generate_graphs(n_graphs, nodes_min=2, nodes_max=200):
@@ -49,40 +50,54 @@ def label_graphs(df, predicates, conformance=1):
 
     unique_labels = list(scores.columns)
     final_labels = predicted_labels.apply(
-        lambda pred: pred if random.random() <= conformance else random.choice(unique_labels)
+        lambda pred: pred if np.random.random() <= conformance else np.random.choice(unique_labels)
     )
     
     return final_labels
 
 def get_predicates(vigor, X, y, n_iter=1000):
-    predicates = vigor.compute_predicate_sequence(
+    failed, predicates = vigor.compute_predicate_sequence(
         X.values,
         y[None],
         attribute_names=X.columns,
         n_iter=n_iter,
     )
     
-    p = Predicate(predicates[0])
-    p.fit(X)
-    return p
+    if failed:
+        return predicates
+    else:
+        p = Predicate(predicates[0])
+        p.fit(X)
+        return p
 
-def denormalize_predicate(predicate, norm_min, norm_max, epsilon):
-    denormalized_clauses = {}
-    for k,v in predicate.clauses.items():
-        denormalized_clauses[k] = v*(norm_max[k] - norm_min[k] - epsilon) + norm_min[k]
-    new_predicate = predicate.copy()
-    new_predicate.clauses = denormalized_clauses
-    return new_predicate
+def denormalize_predicate(pred, min_vals, max_vals):
+    """
+    Denormalize the predicate values back to the original scale.
+    """
+    for attr, range_vals in pred.clauses.items():
+        min_val, max_val = range_vals
+        original_min = min_vals[attr]
+        original_max = max_vals[attr]
+        
+        # Reverse the normalization
+        denorm_min = min_val * (original_max - original_min) + original_min
+        denorm_max = max_val * (original_max - original_min) + original_min
+        pred.clauses[attr] = [denorm_min, denorm_max]
+    
+    return pred
 
 def learn_predicates(df, labels, n_iter=1000):
     """
-    Function to learn predicates from the data
+    Function to learn predicates from the data.
     """
+    # Remove columns with only one unique value
     df = df.loc[:, df.nunique() > 1]
     epsilon = 1e-8  # Small value to avoid division by zero
-    norm_min = df.min()
-    norm_max = df.max()
-    graphs_normalized = (df - norm_min) / (norm_max - norm_min + epsilon)
+    
+    # Normalize the data
+    min_vals = df.min()
+    max_vals = df.max()
+    graphs_normalized = (df - min_vals) / (max_vals - min_vals + epsilon)
 
     vigor = VIGOR()
     pred_list = {}
@@ -90,40 +105,56 @@ def learn_predicates(df, labels, n_iter=1000):
     for visualization in labels.unique():
         ypos = (labels == visualization).astype(int).values
         yneg = (labels != visualization).astype(int).values
+        
         print(f"Learning predicates for {visualization}")
+
+        # Get predicates for positive and negative samples
         pred_pos = get_predicates(vigor, graphs_normalized, ypos, n_iter=n_iter)
         pred_neg = get_predicates(vigor, graphs_normalized, yneg, n_iter=n_iter)
-        
-        pred_list[visualization] = denormalize_predicate(pred_pos, norm_min, norm_max, epsilon), denormalize_predicate(pred_neg, norm_min, norm_max, epsilon)
+
+        # Denormalize the predicates
+        pred_pos = denormalize_predicate(pred_pos, min_vals, max_vals)
+        pred_neg = denormalize_predicate(pred_neg, min_vals, max_vals)
+
+        # Save the denormalized predicates
+        pred_list[visualization] = (pred_pos, pred_neg)
 
     return pred_list
 
 def compute_metrics(initial, learned):
-    """
-    Compute Intersection-over-Union (IoU), Deviation, and Inclusion metrics for evaluation
-    Intersection-over-Union: Measures the overlap between the initial and learned ranges
-    Deviation: Absolute deviation between the initial and learned predicate ranges
-    Inclusion: Checks if the learned range fully falls within the initial range or vice versa
-    """
-    metrics = []
-    for init, learn in zip(initial, learned):
-        min_init, max_init = init['min'], init['max']
-        min_learn, max_learn = learn['min'], learn['max']
+    initial_dict = defaultdict(dict)
+    for vis_type, stat_name, min_val, max_val in initial:
+        capitalized_vis_type = vis_type.value.upper()
+        initial_dict[capitalized_vis_type][stat_name] = [min_val, max_val]
+    initial_dict = dict(initial_dict)
 
-        intersection = max(0, min(max_init, max_learn) - max(min_init, min_learn))
-        union = max(max_init, max_learn) - min(min_init, min_learn)
-        iou = intersection / union if union > 0 else 0
-        deviation = (abs(min_init - min_learn) + abs(max_init - max_learn)) / 2
+    visualizations = learned.keys()
+    
+    evaluation = {}
+    for vis in visualizations:
+        initial_pred = initial_dict[vis]
+        learned_pred = learned[vis][0]
+        stats = initial_pred.keys() & learned_pred.clauses.keys()
+        
+        scores = {}
+        for stat in stats:
+            init = initial_pred[stat]
+            learn = learned_pred.clauses[stat]
 
-        inclusion = 1 if (
-            (min_learn >= min_init and max_learn <= max_init) or
-            (min_init >= min_learn and max_init <= max_learn)
-        ) else 0
+            min_init, max_init = init
+            min_learn, max_learn = float(learn[0]), float(learn[1])
 
-        metrics.append({'IoU': iou, 'Deviation': deviation, 'Inclusion': inclusion})
+            intersection = max(0, min(max_init, max_learn) - max(min_init, min_learn))
+            union = max(max_init, max_learn) - min(min_init, min_learn)
+            iou = intersection / union if union > 0 else 0
+            deviation = (abs(min_init - min_learn) + abs(max_init - max_learn)) / 2
+            
+            inclusion = 1 if (
+                (min_learn >= min_init and max_learn <= max_init) or
+                (min_init >= min_learn and max_init <= max_learn)
+            ) else 0
+                        
+            scores[stat] = {'iou': iou, 'deviation': deviation, 'inclusion': inclusion}
+        evaluation[vis] = scores
 
-    mean_iou = np.mean([m['IoU'] for m in metrics])
-    mean_deviation = np.mean([m['Deviation'] for m in metrics])
-    inclusion_ratio = np.mean([m['Inclusion'] for m in metrics])
-
-    return metrics, mean_iou, mean_deviation, inclusion_ratio
+    return evaluation

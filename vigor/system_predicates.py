@@ -4,7 +4,7 @@ predicates = [
     # Node-Link
     (VisualizationType.NODELINK, 'density', 0, 0.1),
     (VisualizationType.NODELINK, 'is_directed', 0.5, 1),
-    (VisualizationType.NODELINK, 'self_loops', 0, 50),
+    (VisualizationType.NODELINK, 'n_self_loops', 0, 50),
     (VisualizationType.NODELINK, 'components', 1, 5),
     (VisualizationType.NODELINK, 'avg_degree', 1, 3),
     (VisualizationType.NODELINK, 'clustering_coefficient', 0.1, 0.4),
@@ -53,7 +53,7 @@ predicates = [
     (VisualizationType.CHORD_DIAGRAM, 'clustering_coefficient', 0.3, 0.7),
     (VisualizationType.CHORD_DIAGRAM, 'components', 1, 2),
     (VisualizationType.CHORD_DIAGRAM, 'avg_degree', 2, 4),
-    (VisualizationType.CHORD_DIAGRAM, 'parallel_edges', 0, 5),
+    (VisualizationType.CHORD_DIAGRAM, 'n_parallel_edges', 0, 5),
 
     # Treemap
     (VisualizationType.TREEMAP, 'graph_type_1', 0.5, 1),
