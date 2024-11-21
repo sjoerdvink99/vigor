@@ -1,24 +1,42 @@
+import os
+import random
 import numpy as np
 import pandas as pd
 import networkx as nx
 from collections import defaultdict
 from vigor import Graph, Predicate, VIGOR
 
-def generate_graphs(n_graphs, nodes_min=2, nodes_max=200):
+def generate_graphs(n_graphs, nodes_min=2, nodes_max=200, file_path=None):
     """
     Function to generate a list of graphs with random number of nodes and edges
     """
+    file_exists = os.path.exists(file_path)
+
     graphs = []
     for i in range(n_graphs):
-        n = np.random.randint(nodes_min, nodes_max)
-        p = np.random.uniform(0, 0.5)
+        rand_val = random.random()
+        if rand_val < 0.1:
+            r = np.random.randint(1, 10)
+            h = np.random.randint(1, 20)
+            H = nx.balanced_tree(r, h)
+        elif rand_val < 0.2:
+            H = nx.cycle_graph(np.random.randint(nodes_min, 30))
+        else:
+            n = np.random.randint(nodes_min, nodes_max)
+            p = np.random.uniform(0, 0.5)
+            H = nx.fast_gnp_random_graph(n, p)
+
         G = Graph()
-        G.from_existing_graph(nx.fast_gnp_random_graph(n, p))
+        G.from_existing_graph(H)
 
         try:
             statistics = G.get_statistics(testing=True)
             print("Generated statistics for graph", i, statistics)
             graphs.append(statistics)
+            
+            df = pd.DataFrame([statistics])
+            df.to_csv(file_path, mode='a', header=not file_exists, index=False)
+            file_exists = True 
         except:
             print(f"Graph {i} failed to extract statistics")
 
