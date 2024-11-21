@@ -4,6 +4,8 @@ import numpy as np
 import pandas as pd
 import networkx as nx
 from collections import defaultdict
+from sklearn.metrics import precision_recall_fscore_support
+
 from vigor import Graph, Predicate, VIGOR
 
 def generate_graphs(n_graphs, nodes_min=2, nodes_max=200, file_path=None):
@@ -136,7 +138,15 @@ def learn_predicates(df, labels, n_iter=1000):
 
     return pred_list
 
-def compute_metrics(initial, learned):
+def accuracy_metrics(vistype, predicate, graphs, labels):
+    y_true = (labels==vistype).astype(int)
+    predicate.fit(graphs)
+    y_pred = predicate.mask.astype(int)
+    prec, rec, f1, support = np.array(precision_recall_fscore_support(y_true, y_pred))[:,1]
+    acc = (y_true == y_pred).mean()
+    return {'precsion': prec, 'recall': rec, 'f1': f1, 'accuracy': acc}
+
+def compute_metrics(initial, learned, graphs, test_graphs, labels, test_labels):
     initial_dict = defaultdict(dict)
     for vis_type, stat_name, min_val, max_val in initial:
         capitalized_vis_type = vis_type.value.upper()
@@ -170,6 +180,6 @@ def compute_metrics(initial, learned):
             ) else 0
                         
             scores[stat] = {'iou': iou, 'deviation': deviation, 'inclusion': inclusion}
-        evaluation[str(vis)] = scores
+        evaluation[str(vis)] = {'exact': scores, 'describe': accuracy_metrics(vis, learned_pred, graphs, labels), 'generalize': accuracy_metrics(vis, learned_pred, test_graphs, test_labels)}
 
     return evaluation
