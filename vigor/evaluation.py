@@ -170,6 +170,6 @@ def compute_metrics(initial, learned):
             ) else 0
                         
             scores[stat] = {'iou': iou, 'deviation': deviation, 'inclusion': inclusion}
-        evaluation[vis] = scores
+        evaluation[str(vis)] = scores
 
     return evaluation
