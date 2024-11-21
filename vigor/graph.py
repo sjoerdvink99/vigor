@@ -172,9 +172,9 @@ class Graph(nx.Graph):
                 self.assortativity = float(nx.degree_assortativity_coefficient(self))
             except Exception as e:
                 print(f"Error calculating assortativity: {e}")
-                self.assortativity = float('nan')
+                self.assortativity = -1
         else:
-            self.assortativity = float('nan')
+            self.assortativity = -1
 
         if testing:
             self.has_spatial_attributes = random.randint(0, 1)

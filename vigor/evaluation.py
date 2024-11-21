@@ -17,7 +17,7 @@ def generate_graphs(n_graphs, nodes_min=2, nodes_max=200, file_path=None):
         rand_val = random.random()
         if rand_val < 0.1:
             r = np.random.randint(1, 10)
-            h = np.random.randint(1, 20)
+            h = np.random.randint(1, 10)
             H = nx.balanced_tree(r, h)
         elif rand_val < 0.2:
             H = nx.cycle_graph(np.random.randint(nodes_min, 30))
