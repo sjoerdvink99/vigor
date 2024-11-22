@@ -141,7 +141,7 @@ def accuracy_metrics(vistype, predicate, graphs, labels):
     y_true = (labels==vistype).astype(int)
     predicate.fit(graphs)
     y_pred = predicate.mask.astype(int)
-    prec, rec, f1, _ = np.array(precision_recall_fscore_support(y_true, y_pred, zero_division=0))[:,1]
+    prec, rec, f1, _ = np.array(precision_recall_fscore_support(y_true, y_pred, zero_division=0))
     acc = (y_true == y_pred).mean()
     return {'precision': prec, 'recall': rec, 'f1': f1, 'accuracy': acc}
 
