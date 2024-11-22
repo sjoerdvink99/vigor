@@ -15,7 +15,7 @@ class Predicate:
         
     def fit(self, X):
         self.X = X
-        self.mask_ = pd.DataFrame({k: (X[k]<v[1]) & (X[k]>v[0]) for k,v in self.clauses.items() if k in X.columns})
+        self.mask_ = pd.DataFrame({k: (X[k]<=v[1]) & (X[k]>=v[0]) for k,v in self.clauses.items() if k in X.columns})
         self.mask = self.mask_.all(axis=1)
         
     def copy(self):
