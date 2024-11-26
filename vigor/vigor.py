@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from torch import nn, optim
+from textwrap import dedent
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -13,7 +14,7 @@ class VIGOR:
         pred = 1 / (1 + ((a.abs() * (x - mu).abs()).pow(b)).sum(1))
         return pred
 
-    def compute_predicate_sequence(self, x0, selected, attribute_names=[], n_iter=1000, eps=1e-2):
+    def compute_predicate_sequence(self, x0, selected, attribute_names=[], n_iter=1000, eps=1e-2, balanced=True):
         n_points, n_features = x0.shape
 
         vmin, vmax = x0.min(0), x0.max(0)
@@ -31,7 +32,7 @@ class VIGOR:
         a.requires_grad_(True)
         mu.requires_grad_(True)
 
-        bce_per_brush = self._create_bce_per_brush(selected, n_points, x)
+        bce_per_brush = self._create_bce_per_brush(selected, n_points, x, balanced=balanced)
 
         optimizer = optim.SGD(
             [{"params": mu, "weight_decay": 0}, {"params": a, "weight_decay": 0.25}],
@@ -51,16 +52,16 @@ class VIGOR:
         if failed:
             return failed, (mu, a)
         else:
-            return failed, self._generate_predicates(selected, x0, a, mu, mean, scale, vmin, vmax, attribute_names)
+            return failed, self._generate_predicates(selected, x0, a, mu, mean, scale, vmin, vmax, attribute_names, n_points, x, label)
 
-    def _create_bce_per_brush(self, selected, n_points, x):
+    def _create_bce_per_brush(self, selected, n_points, x, balanced=True):
         bce_per_brush = []
         for st in selected:
             n_selected = st.sum()
             n_unselected = n_points - n_selected
             instance_weight = torch.ones(x.shape[0]).to(device)
-            instance_weight[st] = n_points / n_selected
-            instance_weight[~st] = n_points / n_unselected
+            if balanced:
+                instance_weight *= (selected[0]*(n_unselected/n_points) + (1-selected[0])*(n_selected/n_points))
             bce_per_brush.append(nn.BCELoss(weight=instance_weight))
         return bce_per_brush
 
@@ -92,7 +93,36 @@ class VIGOR:
             smoothness_loss += 10 * (mu[1:] - mu[:-1]).pow(2).mean()
         return smoothness_loss
 
-    def _generate_predicates(self, selected, x0, a, mu, mean, scale, vmin, vmax, attribute_names):
+    def _generate_predicates(self, selected, x0, a, mu, mean, scale, vmin, vmax, attribute_names, n_points, x, label):
+        qualities = []
+        for t, st in enumerate(selected):  # for each brush, compute quality
+            pred = self.predict(x, a[t], mu[t])
+            pred = (pred > 0.5).float()
+            correct = (pred == label[t]).float().sum().item()
+            total = n_points
+            accuracy = correct / total
+            # 1 meaning points are selected
+            tp = ((pred == 1).float() * (label == 1).float()).sum().item()
+            fp = ((pred == 1).float() * (label == 0).float()).sum().item()
+            fn = ((pred == 0).float() * (label == 1).float()).sum().item()
+            precision = tp / (tp + fp) if tp + fp > 0 else 0
+            recall = tp / (tp + fn) if tp + fn > 0 else 0
+            f1 = 2 / (1 / precision + 1 / recall) if precision > 0 and recall > 0 else 0
+            print(
+                dedent(
+                    f"""
+                brush = {t}
+                accuracy = {accuracy}
+                precision = {precision}
+                recall = {recall}
+                f1 = {f1}
+            """
+                )
+            )
+            qualities.append(
+                dict(brush=t, accuracy=accuracy, precision=precision, recall=recall, f1=f1)
+            )
+
         predicates = []
         for t, st in enumerate(selected):
             r = 1 / a[t].abs()

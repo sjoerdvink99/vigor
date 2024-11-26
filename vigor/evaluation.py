@@ -43,6 +43,36 @@ def generate_graphs(n_graphs, nodes_min=2, nodes_max=200, file_path=None):
 
     df = pd.DataFrame(graphs)
     return df
+
+def label_graphs_conjunction(df, predicates, conformance=1):
+    """
+    Function to label graphs based on predicates
+    """
+    if not predicates:
+        print("No predicates provided")
+        return df
+    
+    vistype_clauses = {}
+    for vistype, attr, minval, maxval in predicates:
+        if attr in df.columns:
+            if vistype.name in vistype_clauses:
+                vistype_clauses[vistype.name][attr] = [minval, maxval]
+            else:
+                vistype_clauses[vistype.name] = {attr: [minval, maxval]}
+    vistype_predicates = {k: [Predicate(clauses=v)] for k,v in vistype_clauses.items()}
+    for v in vistype_predicates.values():
+        v[0].fit(df)
+
+    vistype_labels = {k: pd.DataFrame({p.attrs[0]: p.mask for p in v}) for k, v in vistype_predicates.items()}
+    scores = pd.DataFrame({k: v.sum(axis=1) for k,v in vistype_labels.items()})
+    predicted_labels = scores.idxmax(axis=1)
+
+    unique_labels = list(scores.columns)
+    final_labels = predicted_labels.apply(
+        lambda pred: pred if np.random.random() <= conformance else np.random.choice(unique_labels)
+    )
+    
+    return final_labels
     
 def label_graphs(df, predicates, conformance=1):
     """
@@ -73,12 +103,14 @@ def label_graphs(df, predicates, conformance=1):
     
     return final_labels
 
-def get_predicates(vigor, X, y, n_iter=1000):
+def get_predicates(vigor, X, y, n_iter=1000, eps=1e-2, balanced=True):
     failed, predicates = vigor.compute_predicate_sequence(
         X.values,
         y[None],
         attribute_names=X.columns,
         n_iter=n_iter,
+        eps=eps,
+        balanced=balanced
     )
     
     if failed:
@@ -104,7 +136,7 @@ def denormalize_predicate(pred, min_vals, max_vals):
     
     return pred
 
-def learn_predicates(df, labels, n_iter=1000):
+def learn_predicates(df, labels, label_names=None, n_iter=1000, eps=1e-2, balanced=True):
     """
     Function to learn predicates from the data.
     """
@@ -120,20 +152,21 @@ def learn_predicates(df, labels, n_iter=1000):
     vigor = VIGOR()
     pred_list = {}
 
-    for visualization in labels.unique():
+    label_names = labels.unique() if label_names is None else label_names
+    for visualization in label_names:
         ypos = (labels == visualization).astype(int).values
-        yneg = (labels != visualization).astype(int).values
+        # yneg = (labels != visualization).astype(int).values
         
         print(f"Learning predicates for {visualization}")
 
         # Get predicates for positive and negative samples
-        pred_pos = get_predicates(vigor, graphs_normalized, ypos, n_iter=n_iter)
-        pred_neg = get_predicates(vigor, graphs_normalized, yneg, n_iter=n_iter)
+        pred_pos = get_predicates(vigor, graphs_normalized, ypos, n_iter=n_iter, eps=eps, balanced=balanced)
+        # pred_neg = get_predicates(vigor, graphs_normalized, yneg, n_iter=n_iter)
 
         # Denormalize the predicates
         pred_pos = denormalize_predicate(pred_pos, min_vals, max_vals)
-        pred_neg = denormalize_predicate(pred_neg, min_vals, max_vals)
-        pred_list[visualization] = (pred_pos, pred_neg)
+        # pred_neg = denormalize_predicate(pred_neg, min_vals, max_vals)
+        pred_list[visualization] = pred_pos # (pred_pos, pred_neg)
 
     return pred_list
 
@@ -157,7 +190,7 @@ def compute_metrics(initial, learned, graphs, test_graphs, labels, test_labels):
     evaluation = {}
     for vis in visualizations:
         initial_pred = initial_dict[vis]
-        learned_pred = learned[vis][0]
+        learned_pred = learned[vis]
         stats = initial_pred.keys() & learned_pred.clauses.keys()
         
         scores = {}
