@@ -1,14 +1,23 @@
 [project]
 name = "vigor"
 version = "0.1.0"
-description = "Add your description here"
+description = "Graph visualization design guidelines as learnable predicates"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "matplotlib>=3.9",
     "networkx>=3.5",
     "numpy>=2.3.4",
     "pandas>=2.3.3",
     "scikit-learn>=1.7.2",
     "statistics>=1.0.3.5",
     "torch>=2.9.0",
+]
+
+[project.scripts]
+vigor-eval = "evaluation.run:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
 ]

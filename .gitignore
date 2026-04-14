@@ -1,5 +1,9 @@
 data/*
 !data/generated_graphs_example.csv
+data/tudatasets/
+results/
+memory/
+docs/
 .venv/
 __pycache__/
 __pycache__
@@ -9,3 +13,4 @@ archive/
 notebooks/graph_data.csv
 notebooks/.ipynb_checkpoints/evaluation-brian-checkpoint.ipynb
 .ipynb_checkpoints/
+paper/
